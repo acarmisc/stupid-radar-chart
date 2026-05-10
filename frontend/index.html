@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Radar Chart - Bakery Style</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Lato:wght@300;400;500;600;700&display=swap');
+    
+    :root {
+      --bakery-cream: #FDFCDC; /* Fresh bread crust */
+      --bakery-brown: #8B5A2B; /* Sourdough dough */
+      --bakery-beige: #E8D5C4; /* Bakery floor */
+      --bakery-gold: #D4AF37; /* Golden crust */
+      --bakery-chocolate: #5C4033; /* Dark chocolate */
+      --bakery-ivory: #FFFFF0; /* Cake frosting */
+      --bakery-rust: #A0522D; /* Burnt orange */
+      --bakery-midnight: #1A1A1A; /* Ink black */
+    }
+    
+    * {
+      box-sizing: border-box;
+    }
+    
+    body {
+      background-color: #F5F0E6;
+      background-image: 
+        repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.03) 10px, rgba(0,0,0,0.03) 20px),
+        url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><rect width="20" height="20" fill="%23F5F0E6"/><path d="M0 0h20v20H0z" fill="none" stroke="%23E8D5C4" stroke-width="0.5"/></svg>');
+      font-family: 'Lato', sans-serif;
+      min-height: 100vh;
+      margin: 0;
+      padding: 40px 20px;
+    }
+    
+    .bakery-header {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 3rem;
+      color: var(--bakery-brown);
+      text-shadow: 2px 2px 0px rgba(0,0,0,0.1);
+      letter-spacing: -1px;
+      text-align: center;
+      position: relative;
+      margin-bottom: 10px;
+    }
+    
+    .bakery-header::after {
+      content: '';
+      display: block;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--bakery-gold), transparent);
+      margin-top: 10px;
+    }
+    
+    .bakery-subtitle {
+      font-family: 'Lato', sans-serif;
+      font-size: 1rem;
+      color: var(--bakery-brown);
+      text-align: center;
+      margin-bottom: 40px;
+      font-weight: 300;
+      letter-spacing: 0.5px;
+    }
+    
+    .bakery-panel {
+      background: #FFFDF8;
+      border: 2px solid var(--bakery-brown);
+      border-radius: 12px;
+      box-shadow: 6px 6px 0px rgba(139, 90, 43, 0.15);
+      padding: 30px;
+      position: relative;
+    }
+    
+    .bakery-panel::before {
+      content: '';
+      position: absolute;
+      top: -2px; left: -2px; right: -2px; bottom: -2px;
+      border: 1px dashed var(--bakery-gold);
+      border-radius: 8px;
+      pointer-events: none;
+    }
+    
+    .bakery-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.75rem;
+      color: var(--bakery-brown);
+      margin-bottom: 10px;
+      position: relative;
+      padding-bottom: 10px;
+    }
+    
+    .bakery-title::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0;
+      width: 60px;
+      height: 2px;
+      background: var(--bakery-gold);
+    }
+    
+    .bakery-input {
+      width: 100%;
+      background: var(--bakery-cream);
+      border: 2px solid var(--bakery-brown);
+      border-radius: 8px;
+      padding: 14px 18px;
+      font-size: 1rem;
+      font-family: 'Lato', sans-serif;
+      color: var(--bakery-brown);
+      transition: all 0.2s;
+      box-shadow: inset 2px 2px 0px rgba(139,90,43,0.1);
+    }
+    
+    .bakery-input:focus {
+      outline: none;
+      background: #FFFDF8;
+      box-shadow: 3px 3px 0px var(--bakery-gold);
+    }
+    
+    .bakery-label {
+      font-weight: 600;
+      color: var(--bakery-brown);
+      font-size: 0.9rem;
+      margin-bottom: 8px;
+      display: block;
+    }
+    
+    .bakery-select {
+      width: 100%;
+      background: var(--bakery-cream);
+      border: 2px solid var(--bakery-brown);
+      border-radius: 8px;
+      padding: 14px 18px;
+      font-size: 1rem;
+      font-family: 'Lato', sans-serif;
+      color: var(--bakery-brown);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .bakery-select:focus {
+      outline: none;
+      box-shadow: 3px 3px 0px var(--bakery-gold);
+    }
+    
+    .bakery-slider-container {
+      background: var(--bakery-cream);
+      padding: 2px;
+      border-radius: 8px;
+      border: 1px solid var(--bakery-brown);
+      position: relative;
+      margin: 16px 0;
+    }
+    
+    .bakery-slider-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 16px;
+      background: var(--bakery-beige);
+      border-bottom: 1px dashed var(--bakery-brown);
+      font-weight: 600;
+      color: var(--bakery-brown);
+    }
+    
+    .bakery-slider-value {
+      background: var(--bakery-chocolate);
+      color: var(--bakery-ivory);
+      padding: 2px 12px;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+    
+    .bakery-slider {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 8px;
+      background: linear-gradient(to right, var(--bakery-gold), var(--bakery-brown));
+      border-radius: 4px;
+      outline: none;
+      border: none;
+    }
+    
+    .bakery-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      background: var(--bakery-ivory);
+      border: 2px solid var(--bakery-brown);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 2px 2px 0px rgba(0,0,0,0.2);
+      transition: all 0.1s;
+    }
+    
+    .bakery-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.1);
+    }
+    
+    .bakery-btn {
+      background: var(--bakery-brown);
+      color: var(--bakery-ivory);
+      border: none;
+      border-radius: 8px;
+      padding: 16px 30px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      font-family: 'Lato', sans-serif;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 4px 4px 0px var(--bakery-rust);
+      position: relative;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    
+    .bakery-btn:hover {
+      background: var(--bakery-chocolate);
+      transform: translateY(-2px);
+      box-shadow: 6px 6px 0px var(--bakery-rust);
+    }
+    
+    .bakery-btn:active {
+      transform: translateY(0px);
+      box-shadow: 2px 2px 0px var(--bakery-rust);
+    }
+    
+    .bakery-btn::before {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: 0.5s;
+    }
+    
+    .bakery-btn:hover::before {
+      left: 100%;
+    }
+    
+    .bakery-btn-secondary {
+      background: var(--bakery-cream);
+      color: var(--bakery-brown);
+      box-shadow: 4px 4px 0px var(--bakery-brown);
+    }
+    
+    .bakery-btn-secondary:hover {
+      background: var(--bakery-beige);
+    }
+    
+    .bakery-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    
+    .bakery-radar-container {
+      position: relative;
+      background: var(--bakery-cream);
+      border: 2px solid var(--bakery-brown);
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 6px 6px 0px rgba(139,90,43,0.15);
+    }
+    
+    .bakery-radar-container::before {
+      content: '';
+      position: absolute;
+      top: -2px; left: -2px; right: -2px; bottom: -2px;
+      border: 1px dashed var(--bakery-gold);
+      border-radius: 8px;
+      pointer-events: none;
+    }
+    
+    .bakery-radar canvas {
+      max-height: 400px !important;
+      width: 100% !important;
+    }
+    
+    .bakery-metadata {
+      background: var(--bakery-cream);
+      border: 2px solid var(--bakery-brown);
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 20px;
+    }
+    
+    .bakery-metadata-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.1rem;
+      color: var(--bakery-brown);
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    
+    .bakery-metadata-item {
+      background: var(--bakery-beige);
+      padding: 8px 14px;
+      border-radius: 6px;
+      margin: 6px 0;
+      border: 1px dashed var(--bakery-brown);
+      font-size: 0.9rem;
+      color: var(--bakery-brown);
+    }
+    
+    .bakery-metadata-item strong {
+      color: var(--bakery-chocolate);
+      font-weight: 700;
+    }
+    
+    .bakery-footer {
+      text-align: center;
+      margin-top: 40px;
+      font-family: 'Lato', sans-serif;
+      font-size: 0.85rem;
+      color: var(--bakery-brown);
+      padding: 20px;
+      background: var(--bakery-ivory);
+      border: 1px solid var(--bakery-beige);
+      border-radius: 8px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    @media (max-width: 768px) {
+      .bakery-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .bakery-header {
+        font-size: 2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="bakery-header">📊 Radar Chart</div>
+  <div class="bakery-subtitle">Generate transparent radar charts from your KPIs</div>
+
+  <div class="bakery-grid">
+    <!-- Form Panel -->
+    <div class="bakery-panel">
+      <h2 class="bakery-title">Configuration</h2>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="bakery-label">Project Title</label>
+          <input type="text" id="title" value="FinOps MVP Dashboard" class="bakery-input">
+        </div>
+
+        <div>
+          <label class="bakery-label">Author</label>
+          <input type="text" id="author" value="Andrea" class="bakery-input">
+        </div>
+
+        <div>
+          <label class="bakery-label">Deliverable Type</label>
+          <select id="deliverable_type" class="bakery-select">
+            <option value="slideshow">Slide Deck</option>
+            <option value="code" selected>Code</option>
+            <option value="workbook">Workbook</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <!-- KPI Sliders -->
+        <div>
+          <h3 class="bakery-title" style="font-size: 1.4rem; margin-top: 30px; margin-bottom: 20px;">KPIs (1-100)</h3>
+          
+          <div class="bakery-slider-container">
+            <div class="bakery-slider-label">
+              <span>author</span>
+              <span id="val-author" class="bakery-slider-value">75</span>
+            </div>
+            <input type="range" id="kpi-author" min="1" max="100" value="75" oninput="updateValue(this.id, 'val-author')">
+          </div>
+
+          <div class="bakery-slider-container">
+            <div class="bakery-slider-label">
+              <span>ai</span>
+              <span id="val-ai" class="bakery-slider-value">85</span>
+            </div>
+            <input type="range" id="kpi-ai" min="1" max="100" value="85" oninput="updateValue(this.id, 'val-ai')">
+          </div>
+
+          <div class="bakery-slider-container">
+            <div class="bakery-slider-label">
+              <span>team</span>
+              <span id="val-team" class="bakery-slider-value">70</span>
+            </div>
+            <input type="range" id="kpi-team" min="1" max="100" value="70" oninput="updateValue(this.id, 'val-team')">
+          </div>
+
+          <div class="bakery-slider-container">
+            <div class="bakery-slider-label">
+              <span>research</span>
+              <span id="val-research" class="bakery-slider-value">65</span>
+            </div>
+            <input type="range" id="kpi-research" min="1" max="100" value="65" oninput="updateValue(this.id, 'val-research')">
+          </div>
+
+          <div class="bakery-slider-container">
+            <div class="bakery-slider-label">
+              <span>unspecified</span>
+              <span id="val-unspecified" class="bakery-slider-value">60</span>
+            </div>
+            <input type="range" id="kpi-unspecified" min="1" max="100" value="60" oninput="updateValue(this.id, 'val-unspecified')">
+          </div>
+        </div>
+
+        <button onclick="generateChart()" class="bakery-btn">Generate Chart</button>
+      </div>
+    </div>
+
+    <!-- Chart Panel -->
+    <div class="bakery-panel" style="display: flex; flex-direction: column;">
+      <h2 class="bakery-title">Preview</h2>
+      
+      <div class="bakery-radar-container" style="flex-grow: 1; position: relative;">
+        <canvas id="radarChart"></canvas>
+        <div class="absolute bottom-4 right-4 space-x-2">
+          <button onclick="exportPNG()" class="bakery-btn bakery-btn-secondary">Export PNG</button>
+        </div>
+      </div>
+
+      <div class="bakery-metadata">
+        <div class="bakery-metadata-title">Metadata</div>
+        <div id="metadata"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bakery-footer">
+    Made with &hearts; - Bakery Style Interface
+  </div>
+
+  <script>
+    let radarChartInstance = null;
+
+    function updateValue(inputId, spanId) {
+      const inputValue = document.getElementById(inputId).value;
+      document.getElementById(spanId).textContent = inputValue;
+    }
+
+    function collectKPIs() {
+      return {
+        author: parseInt(document.getElementById('kpi-author').value),
+        ai: parseInt(document.getElementById('kpi-ai').value),
+        team: parseInt(document.getElementById('kpi-team').value),
+        research: parseInt(document.getElementById('kpi-research').value),
+        unspecified: parseInt(document.getElementById('kpi-unspecified').value)
+      };
+    }
+
+    function generateChart() {
+      const kpis = collectKPIs();
+      const labels = Object.keys(kpis);
+      const values = Object.values(kpis);
+      
+      const title = document.getElementById('title').value;
+      const author = document.getElementById('author').value;
+
+      // Update metadata
+      const metadataEl = document.getElementById('metadata');
+      metadataEl.innerHTML = `
+        <div class="bakery-metadata-item"><strong>Title:</strong> ${title}</div>
+        <div class="bakery-metadata-item"><strong>Author:</strong> ${author}</div>
+        <div class="bakery-metadata-item"><strong>Deliverable:</strong> ${document.getElementById('deliverable_type').value}</div>
+      `;
+
+      // Destroy previous chart if exists
+      if (radarChartInstance) {
+        radarChartInstance.destroy();
+      }
+
+      // Create new chart with transparent background
+      const ctx = document.getElementById('radarChart').getContext('2d');
+      radarChartInstance = new Chart(ctx, {
+        type: 'radar',
+        data: {
+          labels: labels.map(l => l.charAt(0).toUpperCase() + l.slice(1)),
+          datasets: [{
+            label: 'KPI Values',
+            data: values,
+            backgroundColor: 'rgba(139, 90, 43, 0.2)',
+            borderColor: '#8B5A2B',
+            borderWidth: 2,
+            pointBackgroundColor: '#D4AF37',
+            pointBorderColor: '#8B5A2B',
+            pointBorderWidth: 2,
+            pointRadius: 5
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          elements: {
+            line: { tension: 0.4 }
+          },
+          scales: {
+            r: {
+              min: 0,
+              max: 100,
+              grid: {
+                color: 'rgba(139, 90, 43, 0.2)'
+              },
+              angleLines: {
+                color: 'rgba(139, 90, 43, 0.2)'
+              },
+              pointLabels: {
+                color: '#8B5A2B',
+                font: { size: 13, weight: '600' }
+              },
+              ticks: { showLabelBackdrop: false, color: '#8B5A2B' }
+            }
+          },
+          plugins: {
+            legend: {
+              labels: {
+                color: '#8B5A2B',
+                font: { family: 'Lato', weight: '600' }
+              }
+            },
+            title: {
+              display: true,
+              text: title + '\nby ' + author,
+              color: '#5C4033',
+              font: { family: 'Playfair Display', size: 18, weight: '700' }
+            }
+          }
+        }
+      });
+    }
+
+    function exportPNG() {
+      const canvas = document.getElementById('radarChart');
+      const link = document.createElement('a');
+      link.download = 'radar-' + document.getElementById('author').value.replace(/\s+/g, '_') + '-' + Date.now() + '.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    window.addEventListener('load', generateChart);
+  </script>
+</body>
+</html>
