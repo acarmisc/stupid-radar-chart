@@ -111,6 +111,8 @@ export default function HomePage() {
   const [extraKpiInput, setExtraKpiInput] = useState('')
   const [copied, setCopied] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [cloudSlug, setCloudSlug] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   const chartRef = useRef<ChartJS<'radar'> | null>(null)
 
   useEffect(() => {
@@ -184,6 +186,43 @@ export default function HomePage() {
       setTimeout(() => setCopied(false), 2000)
     })
   }, [config])
+
+  const saveToCloud = useCallback(async () => {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/charts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          author,
+          deliverable_type: deliverableType,
+          show_author: showAuthor,
+          locked_values: lockedValues,
+          extra_kpi: extraKpi,
+        }),
+      })
+      if (!res.ok) throw new Error(`Server error: ${res.status}`)
+      const data = await res.json()
+      setCloudSlug(data.slug)
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', `/s/${data.slug}`)
+      }
+    } catch (e: any) {
+      alert('Failed to save: ' + e.message)
+    } finally {
+      setSaving(false)
+    }
+  }, [title, author, deliverableType, showAuthor, lockedValues, extraKpi])
+
+  const copyCloudLink = useCallback(() => {
+    if (!cloudSlug || typeof window === 'undefined') return
+    const url = `${window.location.origin}/s/${cloudSlug}`
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }, [cloudSlug])
 
   const exportPNG = useCallback(async () => {
     const kpisRecord: Record<string, number> = { ...lockedValues }
@@ -332,13 +371,29 @@ export default function HomePage() {
             <div>
               <div className="flex justify-between items-center mt-8 mb-5">
                 <h3 className="text-xl font-semibold text-enterprise-fg">KPIs ({LOCKED_KPI_NAMES.length + (extraKpi ? 1 : 0)})</h3>
-                <button
-                  onClick={copyShareLink}
-                  className="text-xs bg-enterprise-muted text-enterprise-mfg hover:text-enterprise-fg border border-enterprise-border rounded-md px-3 py-1.5 cursor-pointer transition-all"
-                >
-                  {copied ? 'Copied!' : 'Copy Link'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={saveToCloud}
+                    disabled={saving}
+                    className="text-xs bg-enterprise-primary text-enterprise-pfg hover:bg-[#1a70ff] border-none rounded-md px-3 py-1.5 cursor-pointer transition-all disabled:opacity-50"
+                  >
+                    {saving ? 'Saving...' : 'Save to Cloud'}
+                  </button>
+                  {cloudSlug && (
+                    <button
+                      onClick={copyCloudLink}
+                      className="text-xs bg-enterprise-muted text-enterprise-mfg hover:text-enterprise-fg border border-enterprise-border rounded-md px-3 py-1.5 cursor-pointer transition-all"
+                    >
+                      {copied ? 'Copied!' : 'Copy Link'}
+                    </button>
+                  )}
+                </div>
               </div>
+              {cloudSlug && (
+                <div className="text-xs text-enterprise-mfg mb-3">
+                  Saved: <a href={`/s/${cloudSlug}`} className="text-enterprise-primary hover:underline">/s/{cloudSlug}</a>
+                </div>
+              )}
 
               {/* Locked KPIs */}
               {LOCKED_KPI_NAMES.map(name => (
