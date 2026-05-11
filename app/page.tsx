@@ -109,7 +109,6 @@ export default function HomePage() {
   })
 
   const [extraKpiInput, setExtraKpiInput] = useState('')
-  const [copied, setCopied] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [cloudSlug, setCloudSlug] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -176,21 +175,17 @@ export default function HomePage() {
     }
   }, [])
 
-  const copyShareLink = useCallback(() => {
-    if (typeof window === 'undefined') return
-    const baseUrl = window.location.origin + window.location.pathname
-    const hash = encodeConfig(config)
-    const url = `${baseUrl}#${hash}`
-    navigator.clipboard.writeText(url).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
-  }, [config])
+  const copyCloudLink = useCallback(() => {
+    if (!cloudSlug || typeof window === 'undefined') return
+    const url = `${window.location.origin}/s/${cloudSlug}`
+    navigator.clipboard.writeText(url)
+  }, [cloudSlug])
 
-  const saveToCloud = useCallback(async () => {
+  const exportPNG = useCallback(async () => {
     setSaving(true)
     try {
-      const res = await fetch('/api/charts', {
+      // Save to cloud
+      const saveRes = await fetch('/api/charts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -202,48 +197,37 @@ export default function HomePage() {
           extra_kpi: extraKpi,
         }),
       })
-      if (!res.ok) throw new Error(`Server error: ${res.status}`)
-      const data = await res.json()
-      setCloudSlug(data.slug)
+      if (!saveRes.ok) throw new Error(`Server error: ${saveRes.status}`)
+      const saveData = await saveRes.json()
+      setCloudSlug(saveData.slug)
       if (typeof window !== 'undefined') {
-        window.history.replaceState(null, '', `/s/${data.slug}`)
+        window.history.replaceState(null, '', `/s/${saveData.slug}`)
       }
+      // Generate PNG
+      const kpisRecord: Record<string, number> = { ...lockedValues }
+      if (extraKpi) {
+        kpisRecord[extraKpi.name] = extraKpi.value
+      }
+      const res = await fetch('/api/generate-radar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, author, deliverable_type: deliverableType, kpis: kpisRecord, show_author: showAuthor }),
+      })
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status}`)
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.download = `radar-${author.replace(/\s+/g, '_')}-${Date.now()}.png`
+      link.href = url
+      link.click()
+      URL.revokeObjectURL(url)
     } catch (e: any) {
-      alert('Failed to save: ' + e.message)
+      alert('Failed: ' + e.message)
     } finally {
       setSaving(false)
     }
-  }, [title, author, deliverableType, showAuthor, lockedValues, extraKpi])
-
-  const copyCloudLink = useCallback(() => {
-    if (!cloudSlug || typeof window === 'undefined') return
-    const url = `${window.location.origin}/s/${cloudSlug}`
-    navigator.clipboard.writeText(url).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
-  }, [cloudSlug])
-
-  const exportPNG = useCallback(async () => {
-    const kpisRecord: Record<string, number> = { ...lockedValues }
-    if (extraKpi) {
-      kpisRecord[extraKpi.name] = extraKpi.value
-    }
-    const res = await fetch('/api/generate-radar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, author, deliverable_type: deliverableType, kpis: kpisRecord, show_author: showAuthor }),
-    })
-    if (!res.ok) {
-      throw new Error(`Server error: ${res.status}`)
-    }
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.download = `radar-${author.replace(/\s+/g, '_')}-${Date.now()}.png`
-    link.href = url
-    link.click()
-    URL.revokeObjectURL(url)
   }, [title, author, deliverableType, lockedValues, extraKpi, showAuthor])
 
   const labels = [
@@ -371,29 +355,7 @@ export default function HomePage() {
             <div>
               <div className="flex justify-between items-center mt-8 mb-5">
                 <h3 className="text-xl font-semibold text-enterprise-fg">KPIs ({LOCKED_KPI_NAMES.length + (extraKpi ? 1 : 0)})</h3>
-                <div className="flex gap-2">
-                  <button
-                    onClick={saveToCloud}
-                    disabled={saving}
-                    className="text-xs bg-enterprise-primary text-enterprise-pfg hover:bg-[#1a70ff] border-none rounded-md px-3 py-1.5 cursor-pointer transition-all disabled:opacity-50"
-                  >
-                    {saving ? 'Saving...' : 'Save to Cloud'}
-                  </button>
-                  {cloudSlug && (
-                    <button
-                      onClick={copyCloudLink}
-                      className="text-xs bg-enterprise-muted text-enterprise-mfg hover:text-enterprise-fg border border-enterprise-border rounded-md px-3 py-1.5 cursor-pointer transition-all"
-                    >
-                      {copied ? 'Copied!' : 'Copy Link'}
-                    </button>
-                  )}
-                </div>
               </div>
-              {cloudSlug && (
-                <div className="text-xs text-enterprise-mfg mb-3">
-                  Saved: <a href={`/s/${cloudSlug}`} className="text-enterprise-primary hover:underline">/s/{cloudSlug}</a>
-                </div>
-              )}
 
               {/* Locked KPIs */}
               {LOCKED_KPI_NAMES.map(name => (
@@ -472,14 +434,16 @@ export default function HomePage() {
 
           <div className="bg-enterprise-card border border-enterprise-border rounded-xl p-6 relative min-h-[400px]">
             <Radar ref={chartRef} data={data} options={options} style={{ maxHeight: 350 }} />
-            <div className="absolute bottom-4 right-4">
-              <button
-                onClick={exportPNG}
-                className="bg-enterprise-primary text-enterprise-pfg hover:bg-[#1a70ff] border-none rounded-lg px-6 py-3 text-sm font-semibold cursor-pointer transition-all active:translate-y-[1px]"
-              >
-                Export PNG
-              </button>
-            </div>
+          </div>
+
+          <div className="mt-4 flex justify-center">
+            <button
+              onClick={exportPNG}
+              disabled={saving}
+              className="bg-enterprise-primary text-enterprise-pfg hover:bg-[#1a70ff] border-none rounded-lg px-6 py-3 text-sm font-semibold cursor-pointer transition-all active:translate-y-[1px] disabled:opacity-50"
+            >
+              Generate PNG & Save
+            </button>
           </div>
 
           <div className="bg-enterprise-muted border border-enterprise-border rounded-lg p-4 mt-5">
@@ -489,6 +453,28 @@ export default function HomePage() {
             <div className="bg-enterprise-card border border-enterprise-border rounded-md px-3 py-2 my-2 text-sm text-enterprise-fg"><strong>Deliverable:</strong> {deliverableType}</div>
             <div className="bg-enterprise-card border border-enterprise-border rounded-md px-3 py-2 my-2 text-sm text-enterprise-fg"><strong>KPIs:</strong> {[...LOCKED_KPI_NAMES, ...(extraKpi ? [extraKpi.name] : [])].join(', ')}</div>
           </div>
+
+          {cloudSlug && typeof window !== 'undefined' && (
+            <div className="bg-enterprise-card border border-enterprise-border rounded-lg p-4 mt-4">
+              <div className="text-sm font-medium text-enterprise-fg mb-2">Share this chart</div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={`${window.location.origin}/s/${cloudSlug}`}
+                  className="flex-1 bg-enterprise-muted border border-enterprise-border rounded-md px-3 py-2 text-sm text-enterprise-fg focus:outline-none"
+                  onClick={e => e.currentTarget.select()}
+                />
+                <button
+                  onClick={copyCloudLink}
+                  className="bg-enterprise-primary text-enterprise-pfg hover:bg-[#1a70ff] border-none rounded-md px-3 py-2 text-sm font-semibold cursor-pointer transition-all whitespace-nowrap"
+                  title="Copy link to clipboard"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
