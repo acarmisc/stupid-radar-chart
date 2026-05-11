@@ -1,91 +1,96 @@
 # Stupid Radar Chart App 📊
 
-Un'applicazione semplice ma efficace per generare diagrammi radar esportabili come PNG trasparente.
+A simple but effective radar chart generator with transparent PNG export.
 
-## 🚀 Come avviare l'applicazione
+![App Screenshot](screenshot-interactive.png)
+
+## 🚀 Quick Start
+
+### Docker (Recommended)
 
 ```bash
-# Apri due terminali
+# Build image
+docker build -t stupid-radar-chart .
 
-# Terminal 1 - Backend API (FastAPI)
-cd /root/projects/stupid-radar-app/backend
-pip3 install fastapi uvicorn matplotlib numpy
-python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+# Run container
+docker run -p 3000:3000 stupid-radar-chart
 
-# Terminal 2 - Frontend (serve sola static file)
-cd /root/projects/stupid-radar-app/frontend
-python3 -m http.server 8080
+# Open http://localhost:3000
 ```
 
-Oppure usa il script unificato:
+### Local Development
+
 ```bash
-chmod +x /root/projects/stupid-radar-app/start.sh
-/root/projects/stupid-radar-app/start.sh
+npm install
+npm run dev
 ```
 
-## 🔧 Funzionalità
+Open http://localhost:3000
 
-- ✅ Form per configurare KPIs (Valori da 1 a 100)
-- ✅ Generazione diagramma radar in tempo reale
-- ✅ Esportazione PNG con sfondo trasparente
-- ✅ Supporto metadata: title, author, deliverable_type
-- ✅ Design glassmorphism moderno
-- ✅ Drag-and-drop ready (no build required!)
+## 🔧 Features
 
-## 📊 KPIs Supportati
+- **KPI Configuration** — Adjust sliders for 5 KPIs (values 1–100)
+- **Real-time Preview** — Chart.js radar chart updates live
+- **Client PNG Export** — Instant browser download via `canvas.toDataURL()`
+- **Server PNG Export** — SVG → PNG via `sharp` with high-quality rendering
+- **Modern Design** — Enterprise Mod 2 glassmorphism theme
 
-1. **Author** - Chi ha sviluppato il progetto
-2. **AI** - Livello di integrazione AI/ML
-3. **Team** -Collaborazione di sistema
-4. **Research** - Approfondimento scientifico
-5. **Unspecified** - Altri aspetti
+## 📊 Supported KPIs
 
-## 🛠️ Stack Tecnologico
+| KPI | Description |
+|-----|-------------|
+| **Author** | Project authorship |
+| **AI** | AI/ML integration level |
+| **Team** | System collaboration |
+| **Research** | Scientific depth |
+| **Unspecified** | Other aspects |
 
-- **Backend:** FastAPI + Matplotlib
-- **Frontend:** Vanilla HTML/CSS/JS + Chart.js
-- **Deployment:** Dockerizable, ready for Heroku/GCP Cloud Run
+## 🛠️ Stack
 
-## 📁 Struttura Progetto
+- **Frontend:** React + Next.js + Tailwind CSS + Chart.js
+- **Server PNG:** sharp (SVG → PNG conversion)
+- **No database required**
+
+## 📁 Project Structure
 
 ```
-stupid-radar-app/
-├── backend/
-│   ├── main.py          # FastAPI application
-│   └── requirements.txt
-├── frontend/
-│   ├── index.html       # Single page application
-│   └── package.json
-├── start.sh             # Script di avvio
-└── README.md
+app/
+  page.tsx                  # Main UI (client component)
+  layout.tsx                # Root layout
+  globals.css               # Tailwind + custom styles
+  styles.css                # Custom slider styles
+  api/
+    generate-radar/
+      route.ts              # Server-side PNG generation
+Dockerfile                  # Multi-stage production build
+README.md
+AGENTS.md
 ```
 
-## 🔗 Accesso
+## 🎨 Screenshots
 
-Dopo aver avviato i server:
-- Frontend: http://localhost:8080
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
+### App Interface
+![Interactive View](screenshot-interactive.png)
 
-## 🎨 Customizzazione
+### Server-Generated PNG Output
+![Server PNG Export](screenshot-server-png.png)
 
-Modifica i KPIs editando:
-- **Frontend:** `index.html` section `<!-- KPI Sliders -->`
-- **Backend:** `main.py` section `RadarRequest` model
+### Full Page View
+![Full Page](screenshot-home.png)
 
 ## 🐛 Troubleshooting
 
-**Permission denied on port 8000?**
+**sharp fails to install?**
 ```bash
-sudo lsof -i :8000
+npm install --platform=linux --arch=x64 sharp
 ```
 
-**SVG to PNG conversion failing?**
-Assicurati che `cairosvg` sia installato:
+**Docker build fails?**
+Ensure Docker is running and try:
 ```bash
-pip3 install cairosvg
+docker build --no-cache -t stupid-radar-chart .
 ```
 
 ## 📝 License
 
-MIT - Made with ❤️ by Andrea Carmisciano
+MIT — Made with ❤️ by Andrea Carmisciano
