@@ -37,13 +37,21 @@ export async function POST(request: NextRequest) {
     const fontSize = 22
     const labelOffset = 30
 
-    // Background and style
+    // Theme colors (Enterprise Mod 2)
+    const bg = '#ffffff'
+    const fg = '#0d0d12'
+    const mutedFg = '#52525e'
+    const grid = '#e3e3ea'
+    const primary = '#0F62FE'
+    const primaryAlpha = 'rgba(15, 98, 254, 0.2)'
+    const pointColor = '#6b46ff'
+
     let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">`
-    svg += `<defs><filter id="shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#0d0d12" flood-opacity="0.08"/></filter></defs>`
-    svg += `<rect width="100%" height="100%" fill="#fdfdff"/>`
-    svg += `<text x="${cx}" y="40" text-anchor="middle" font-family="Inter, sans-serif" font-size="28" font-weight="700" fill="#0d0d12">${escapeXml(title || '')}</text>`
+    svg += `<defs><filter id="shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#111827" flood-opacity="0.08"/></filter></defs>`
+    svg += `<rect width="100%" height="100%" fill="${bg}"/>`
+    svg += `<text x="${cx}" y="40" text-anchor="middle" font-family="var(--font-sans), sans-serif" font-size="28" font-weight="700" fill="${fg}">${escapeXml(title || '')}</text>`
     if (show_author !== false) {
-      svg += `<text x="${cx}" y="75" text-anchor="middle" font-family="Inter, sans-serif" font-size="18" font-weight="400" fill="#62627a">by ${escapeXml(author || '')}</text>`
+      svg += `<text x="${cx}" y="75" text-anchor="middle" font-family="var(--font-sans), sans-serif" font-size="18" font-weight="400" fill="${mutedFg}">by ${escapeXml(author || '')}</text>`
     }
 
     // Grid levels
@@ -57,7 +65,7 @@ export async function POST(request: NextRequest) {
         const y = cy + r * Math.sin(angle)
         points.push(`${x},${y}`)
       }
-      svg += `<polygon points="${points.join(' ')}" fill="none" stroke="#e2e2ee" stroke-width="2"/>`
+      svg += `<polygon points="${points.join(' ')}" fill="none" stroke="${grid}" stroke-width="2"/>`
     }
 
     // Axis lines and labels
@@ -70,7 +78,7 @@ export async function POST(request: NextRequest) {
       const lx = cx + (radius + labelOffset) * Math.cos(angle)
       const ly = cy + (radius + labelOffset) * Math.sin(angle)
       const textAnchor = Math.abs(angle + Math.PI / 2) < 0.01 ? 'middle' : (lx > cx ? 'start' : 'end')
-      svg += `<text x="${lx}" y="${ly + fontSize / 3}" text-anchor="${textAnchor}" font-family="Inter, sans-serif" font-size="${fontSize}" font-weight="500" fill="#0d0d12">${escapeXml(kpiNames[i])}</text>`
+      svg += `<text x="${lx}" y="${ly + fontSize / 3}" text-anchor="${textAnchor}" font-family="var(--font-sans), sans-serif" font-size="${fontSize}" font-weight="500" fill="${fg}">${escapeXml(kpiNames[i])}</text>`
     }
 
     // Data polygon
@@ -81,15 +89,15 @@ export async function POST(request: NextRequest) {
     })
 
     const pointStr = dataPoints.map(p => `${p.x},${p.y}`).join(' ')
-    svg += `<polygon points="${pointStr}" fill="rgba(15, 98, 254, 0.2)" stroke="#0F62FE" stroke-width="3" stroke-linejoin="round"/>`
+    svg += `<polygon points="${pointStr}" fill="${primaryAlpha}" stroke="${primary}" stroke-width="3" stroke-linejoin="round"/>`
 
     // Data points
     for (const p of dataPoints) {
-      svg += `<circle cx="${p.x}" cy="${p.y}" r="6" fill="#6b46ff" stroke="#0F62FE" stroke-width="2"/>`
+      svg += `<circle cx="${p.x}" cy="${p.y}" r="6" fill="${pointColor}" stroke="${primary}" stroke-width="2"/>`
     }
 
     // metadata watermark
-    svg += `<text x="${cx}" y="${size - 20}" text-anchor="middle" font-family="Inter, sans-serif" font-size="14" fill="#62627a">${escapeXml(deliverable_type || '')}</text>`
+    svg += `<text x="${cx}" y="${size - 20}" text-anchor="middle" font-family="var(--font-sans), sans-serif" font-size="14" fill="${mutedFg}">${escapeXml(deliverable_type || '')}</text>`
 
     svg += `</svg>`
 

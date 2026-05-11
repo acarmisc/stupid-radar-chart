@@ -18,34 +18,32 @@ import './styles.css'
 
 ChartJS.register(RadialLinearScale, LineElement, PointElement, Filler, Tooltip, Legend, Title)
 
-const STORAGE_KEY = 'stupid-radar-chart-v1'
+const STORAGE_KEY = 'stupid-radar-chart-v2'
 
-interface KpiItem {
-  id: string
-  name: string
-  value: number
-}
+const LOCKED_KPI_NAMES = ['author', 'ai', 'team', 'research', 'unspecified'] as const
 
 interface ChartConfig {
   title: string
   author: string
   deliverableType: string
-  kpis: KpiItem[]
   showAuthor: boolean
+  extraKpi: { name: string; value: number } | null
+  lockedValues: Record<string, number>
 }
 
 const DEFAULT_CONFIG: ChartConfig = {
-  title: 'FinOps MVP Dashboard',
-  author: 'Andrea',
-  deliverableType: 'code',
+  title: 'Project Radar',
+  author: 'Team',
+  deliverableType: 'other',
   showAuthor: true,
-  kpis: [
-    { id: 'k1', name: 'author', value: 75 },
-    { id: 'k2', name: 'ai', value: 85 },
-    { id: 'k3', name: 'team', value: 70 },
-    { id: 'k4', name: 'research', value: 65 },
-    { id: 'k5', name: 'unspecified', value: 60 },
-  ],
+  extraKpi: null,
+  lockedValues: {
+    author: 50,
+    ai: 50,
+    team: 50,
+    research: 50,
+    unspecified: 50,
+  },
 }
 
 function encodeConfig(config: ChartConfig): string {
@@ -54,7 +52,8 @@ function encodeConfig(config: ChartConfig): string {
     a: config.author,
     d: config.deliverableType,
     s: config.showAuthor,
-    k: config.kpis.map(k => [k.name, k.value]),
+    e: config.extraKpi ? [config.extraKpi.name, config.extraKpi.value] : null,
+    v: config.lockedValues,
   }
   return btoa(JSON.stringify(payload))
 }
@@ -67,13 +66,8 @@ function decodeConfig(hash: string): ChartConfig | null {
       author: payload.a || DEFAULT_CONFIG.author,
       deliverableType: payload.d || DEFAULT_CONFIG.deliverableType,
       showAuthor: payload.s !== false,
-      kpis: Array.isArray(payload.k)
-        ? payload.k.map(([name, value]: [string, number], i: number) => ({
-            id: `k${i + 1}`,
-            name: String(name),
-            value: Number(value) || 0,
-          }))
-        : [...DEFAULT_CONFIG.kpis],
+      extraKpi: payload.e ? { name: String(payload.e[0]), value: Number(payload.e[1]) || 0 } : null,
+      lockedValues: payload.v && typeof payload.v === 'object' ? payload.v : { ...DEFAULT_CONFIG.lockedValues },
     }
   } catch {
     return null
@@ -101,7 +95,6 @@ function saveToStorage(config: ChartConfig) {
 }
 
 export default function HomePage() {
-  // Initialize from URL hash > localStorage > defaults
   const [config, setConfig] = useState<ChartConfig>(() => {
     if (typeof window !== 'undefined') {
       const hash = window.location.hash.slice(1)
@@ -115,18 +108,21 @@ export default function HomePage() {
     return { ...DEFAULT_CONFIG }
   })
 
-  const [newKpiName, setNewKpiName] = useState('')
+  const [extraKpiInput, setExtraKpiInput] = useState('')
   const [copied, setCopied] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const chartRef = useRef<ChartJS<'radar'> | null>(null)
 
-  const { title, author, deliverableType, kpis, showAuthor } = config
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
-  // Persist to localStorage whenever config changes
+  const { title, author, deliverableType, showAuthor, extraKpi, lockedValues } = config
+
   useEffect(() => {
     saveToStorage(config)
   }, [config])
 
-  // Update URL hash whenever config changes (shareable link)
   useEffect(() => {
     if (typeof window === 'undefined') return
     const hash = encodeConfig(config)
@@ -137,33 +133,38 @@ export default function HomePage() {
     setConfig(prev => ({ ...prev, [key]: value }))
   }, [])
 
-  const handleKpiChange = useCallback((id: string, value: string) => {
+  const handleLockedKpiChange = useCallback((name: string, value: string) => {
     setConfig(prev => ({
       ...prev,
-      kpis: prev.kpis.map(k => (k.id === id ? { ...k, value: parseInt(value, 10) || 0 } : k)),
+      lockedValues: { ...prev.lockedValues, [name]: parseInt(value, 10) || 0 },
     }))
   }, [])
 
-  const handleKpiNameChange = useCallback((id: string, name: string) => {
-    setConfig(prev => ({
-      ...prev,
-      kpis: prev.kpis.map(k => (k.id === id ? { ...k, name } : k)),
-    }))
-  }, [])
-
-  const addKpi = useCallback(() => {
-    const name = newKpiName.trim()
+  const addExtraKpi = useCallback(() => {
+    const name = extraKpiInput.trim()
     if (!name) return
-    const id = `k${Date.now()}`
-    setConfig(prev => ({ ...prev, kpis: [...prev.kpis, { id, name, value: 50 }] }))
-    setNewKpiName('')
-  }, [newKpiName])
+    setConfig(prev => ({ ...prev, extraKpi: { name, value: 50 } }))
+    setExtraKpiInput('')
+  }, [extraKpiInput])
 
-  const removeKpi = useCallback((id: string) => {
-    setConfig(prev => {
-      if (prev.kpis.length <= 1) return prev // keep at least 1
-      return { ...prev, kpis: prev.kpis.filter(k => k.id !== id) }
-    })
+  const removeExtraKpi = useCallback(() => {
+    setConfig(prev => ({ ...prev, extraKpi: null }))
+  }, [])
+
+  const handleExtraKpiValueChange = useCallback((value: string) => {
+    setConfig(prev =>
+      prev.extraKpi
+        ? { ...prev, extraKpi: { ...prev.extraKpi, value: parseInt(value, 10) || 0 } }
+        : prev
+    )
+  }, [])
+
+  const handleExtraKpiNameChange = useCallback((name: string) => {
+    setConfig(prev =>
+      prev.extraKpi
+        ? { ...prev, extraKpi: { ...prev.extraKpi, name } }
+        : prev
+    )
   }, [])
 
   const resetConfig = useCallback(() => {
@@ -184,8 +185,37 @@ export default function HomePage() {
     })
   }, [config])
 
-  const labels = kpis.map(k => k.name.charAt(0).toUpperCase() + k.name.slice(1))
-  const values = kpis.map(k => k.value)
+  const exportPNG = useCallback(async () => {
+    const kpisRecord: Record<string, number> = { ...lockedValues }
+    if (extraKpi) {
+      kpisRecord[extraKpi.name] = extraKpi.value
+    }
+    const res = await fetch('/api/generate-radar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, author, deliverable_type: deliverableType, kpis: kpisRecord, show_author: showAuthor }),
+    })
+    if (!res.ok) {
+      throw new Error(`Server error: ${res.status}`)
+    }
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.download = `radar-${author.replace(/\s+/g, '_')}-${Date.now()}.png`
+    link.href = url
+    link.click()
+    URL.revokeObjectURL(url)
+  }, [title, author, deliverableType, lockedValues, extraKpi, showAuthor])
+
+  const labels = [
+    ...LOCKED_KPI_NAMES.map(k => k.charAt(0).toUpperCase() + k.slice(1)),
+    ...(extraKpi ? [extraKpi.name.charAt(0).toUpperCase() + extraKpi.name.slice(1)] : []),
+  ]
+
+  const values = [
+    ...LOCKED_KPI_NAMES.map(name => lockedValues[name] ?? 50),
+    ...(extraKpi ? [extraKpi.value] : []),
+  ]
 
   const data = {
     labels,
@@ -232,37 +262,6 @@ export default function HomePage() {
       },
     },
   }
-
-  const exportPNG = useCallback(() => {
-    const chart = chartRef.current
-    if (!chart) return
-    const link = document.createElement('a')
-    link.download = `radar-${author.replace(/\s+/g, '_')}-${Date.now()}.png`
-    link.href = chart.toBase64Image()
-    link.click()
-  }, [author])
-
-  const exportServerPNG = useCallback(async () => {
-    const kpisRecord: Record<string, number> = {}
-    for (const k of kpis) {
-      kpisRecord[k.name] = k.value
-    }
-    const res = await fetch('/api/generate-radar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, author, deliverable_type: deliverableType, kpis: kpisRecord, show_author: showAuthor }),
-    })
-    if (!res.ok) {
-      throw new Error(`Server error: ${res.status}`)
-    }
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.download = `radar-${author.replace(/\s+/g, '_')}-${Date.now()}.png`
-    link.href = url
-    link.click()
-    URL.revokeObjectURL(url)
-  }, [title, author, deliverableType, kpis, showAuthor])
 
   return (
     <div className="min-h-screen px-5 py-10" style={{ background: '#fdfdff', fontFamily: "'Inter', sans-serif" }}>
@@ -332,7 +331,7 @@ export default function HomePage() {
 
             <div>
               <div className="flex justify-between items-center mt-8 mb-5">
-                <h3 className="text-xl font-semibold text-enterprise-fg">KPIs ({kpis.length})</h3>
+                <h3 className="text-xl font-semibold text-enterprise-fg">KPIs ({LOCKED_KPI_NAMES.length + (extraKpi ? 1 : 0)})</h3>
                 <button
                   onClick={copyShareLink}
                   className="text-xs bg-enterprise-muted text-enterprise-mfg hover:text-enterprise-fg border border-enterprise-border rounded-md px-3 py-1.5 cursor-pointer transition-all"
@@ -341,21 +340,39 @@ export default function HomePage() {
                 </button>
               </div>
 
-              {kpis.map(kpi => (
-                <div key={kpi.id} className="mb-6">
+              {/* Locked KPIs */}
+              {LOCKED_KPI_NAMES.map(name => (
+                <div key={name} className="mb-6">
+                  <div className="flex justify-between items-center py-3">
+                    <span className="text-sm font-medium text-enterprise-fg capitalize">{name}</span>
+                    <span className="bg-enterprise-secondary text-enterprise-sfg px-2.5 py-1 rounded-md text-sm font-semibold">{lockedValues[name] ?? 50}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={100}
+                    value={lockedValues[name] ?? 50}
+                    onChange={e => handleLockedKpiChange(name, e.target.value)}
+                    className="slider"
+                  />
+                </div>
+              ))}
+
+              {/* Optional extra KPI */}
+              {extraKpi && (
+                <div className="mb-6 border-t border-dashed border-enterprise-border pt-4">
                   <div className="flex justify-between items-center py-3 gap-2">
                     <input
                       type="text"
-                      value={kpi.name}
-                      onChange={e => handleKpiNameChange(kpi.id, e.target.value)}
+                      value={extraKpi.name}
+                      onChange={e => handleExtraKpiNameChange(e.target.value)}
                       className="flex-1 bg-enterprise-card border border-enterprise-border rounded-md px-3 py-1.5 text-sm text-enterprise-fg focus:outline-none focus:border-enterprise-ring transition-all capitalize"
                     />
-                    <span className="bg-enterprise-secondary text-enterprise-sfg px-2.5 py-1 rounded-md text-sm font-semibold">{kpi.value}</span>
+                    <span className="bg-enterprise-secondary text-enterprise-sfg px-2.5 py-1 rounded-md text-sm font-semibold">{extraKpi.value}</span>
                     <button
-                      onClick={() => removeKpi(kpi.id)}
-                      disabled={kpis.length <= 1}
-                      className="text-enterprise-mfg hover:text-red-500 text-sm px-2 py-1 rounded-md cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                      title="Remove KPI"
+                      onClick={removeExtraKpi}
+                      className="text-enterprise-mfg hover:text-red-500 text-sm px-2 py-1 rounded-md cursor-pointer transition-all"
+                      title="Remove custom KPI"
                     >
                       ×
                     </button>
@@ -364,30 +381,32 @@ export default function HomePage() {
                     type="range"
                     min={1}
                     max={100}
-                    value={kpi.value}
-                    onChange={e => handleKpiChange(kpi.id, e.target.value)}
+                    value={extraKpi.value}
+                    onChange={e => handleExtraKpiValueChange(e.target.value)}
                     className="slider"
                   />
                 </div>
-              ))}
+              )}
 
-              <div className="flex gap-2 mt-4">
-                <input
-                  type="text"
-                  placeholder="New KPI name..."
-                  value={newKpiName}
-                  onChange={e => setNewKpiName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') addKpi() }}
-                  className="flex-1 bg-enterprise-card border border-enterprise-border rounded-lg px-4 py-2.5 text-sm text-enterprise-fg focus:outline-none focus:border-enterprise-ring focus:ring-1 focus:ring-enterprise-ring transition-all"
-                />
-                <button
-                  onClick={addKpi}
-                  disabled={!newKpiName.trim()}
-                  className="bg-enterprise-primary text-enterprise-pfg hover:bg-[#1a70ff] border-none rounded-lg px-4 py-2.5 text-sm font-semibold cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  + Add
-                </button>
-              </div>
+              {!extraKpi && (
+                <div className="flex gap-2 mt-4">
+                  <input
+                    type="text"
+                    placeholder="Custom KPI name..."
+                    value={extraKpiInput}
+                    onChange={e => setExtraKpiInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') addExtraKpi() }}
+                    className="flex-1 bg-enterprise-card border border-enterprise-border rounded-lg px-4 py-2.5 text-sm text-enterprise-fg focus:outline-none focus:border-enterprise-ring focus:ring-1 focus:ring-enterprise-ring transition-all"
+                  />
+                  <button
+                    onClick={addExtraKpi}
+                    disabled={!extraKpiInput.trim()}
+                    className="bg-enterprise-primary text-enterprise-pfg hover:bg-[#1a70ff] border-none rounded-lg px-4 py-2.5 text-sm font-semibold cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    + Add
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -398,18 +417,12 @@ export default function HomePage() {
 
           <div className="bg-enterprise-card border border-enterprise-border rounded-xl p-6 relative min-h-[400px]">
             <Radar ref={chartRef} data={data} options={options} style={{ maxHeight: 350 }} />
-            <div className="absolute bottom-4 right-4 space-x-2">
+            <div className="absolute bottom-4 right-4">
               <button
                 onClick={exportPNG}
-                className="bg-enterprise-muted text-enterprise-mfg hover:bg-[#e8e8f0] border-none rounded-lg px-6 py-3 text-sm font-semibold cursor-pointer transition-all active:translate-y-[1px]"
-              >
-                Export PNG (Client)
-              </button>
-              <button
-                onClick={exportServerPNG}
                 className="bg-enterprise-primary text-enterprise-pfg hover:bg-[#1a70ff] border-none rounded-lg px-6 py-3 text-sm font-semibold cursor-pointer transition-all active:translate-y-[1px]"
               >
-                Export PNG (Server)
+                Export PNG
               </button>
             </div>
           </div>
@@ -419,13 +432,13 @@ export default function HomePage() {
             <div className="bg-enterprise-card border border-enterprise-border rounded-md px-3 py-2 my-2 text-sm text-enterprise-fg"><strong>Title:</strong> {title}</div>
             <div className="bg-enterprise-card border border-enterprise-border rounded-md px-3 py-2 my-2 text-sm text-enterprise-fg"><strong>Author:</strong> {author}</div>
             <div className="bg-enterprise-card border border-enterprise-border rounded-md px-3 py-2 my-2 text-sm text-enterprise-fg"><strong>Deliverable:</strong> {deliverableType}</div>
-            <div className="bg-enterprise-card border border-enterprise-border rounded-md px-3 py-2 my-2 text-sm text-enterprise-fg"><strong>KPIs:</strong> {kpis.map(k => k.name).join(', ')}</div>
+            <div className="bg-enterprise-card border border-enterprise-border rounded-md px-3 py-2 my-2 text-sm text-enterprise-fg"><strong>KPIs:</strong> {[...LOCKED_KPI_NAMES, ...(extraKpi ? [extraKpi.name] : [])].join(', ')}</div>
           </div>
         </div>
       </div>
 
       <div className="text-center mt-10 text-sm text-enterprise-mfg p-4 bg-enterprise-muted rounded-lg max-w-[600px] mx-auto">
-        Enterprise Mod 2 Theme - Corporate, Professional, Elegant
+        Enterprise Mod 2 Theme — Corporate, Professional, Elegant
       </div>
     </div>
   )
